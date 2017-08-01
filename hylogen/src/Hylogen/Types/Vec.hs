@@ -103,6 +103,9 @@ instance (Veccable n) => Floating (Vec n) where
   acosh x = log $ x + sqrt(x**2 - 1)
   atanh x = 0.5 * log ((1 + x)/(1 - x))
 
+atan2_ :: Vec1 -> Vec1 -> Vec1
+atan2_ = op2pre' "atan"
+
 instance Veccable n => AdditiveGroup (Vec n) where
   zeroV = 0
   (^+^) = (+)
