@@ -34,13 +34,14 @@ data Msg = Err String
 main :: IO ()
 main = do
   getArgs >>= \case
-    [pathToWatch] -> main' pathToWatch
+    [pathToWatch] -> main' pathToWatch Nothing
+    [pathToWatch, glslFile] -> main' pathToWatch (Just glslFile)
     _ -> error "Error: Name a file to watch!"
 
-main' :: FilePath ->  IO ()
-main' pathToWatch = do
+main' :: FilePath -> Maybe FilePath -> IO ()
+main' pathToWatch glslFile = do
   tid1 <- forkIO serveIndex
-  tid2 <- forkIO $ serveGLSL pathToWatch
+  tid2 <- forkIO $ serveGLSL pathToWatch glslFile
   putStrLn "Press enter to exit."
   void getLine
   killThread tid1
@@ -48,15 +49,16 @@ main' pathToWatch = do
 
 
 
-serveGLSL :: FilePath -> IO ()
-serveGLSL pathToWatch = do
+serveGLSL :: FilePath -> Maybe FilePath -> IO ()
+serveGLSL pathToWatch glslFile = do
   withManager
     $ S.runServer "127.0.0.1" 8080
-    . handleConnection pathToWatch
+    . handleConnection pathToWatch glslFile
   return ()
 
-handleConnection :: FilePath -> WatchManager -> S.PendingConnection -> IO ()
-handleConnection pathToWatch mgr pending = do
+handleConnection :: FilePath -> Maybe FilePath -> WatchManager
+                 -> S.PendingConnection -> IO ()
+handleConnection pathToWatch glslFile mgr pending = do
    let (dirToWatch, _) = splitFileName pathToWatch
    connection <- S.acceptRequest pending
 
@@ -64,6 +66,12 @@ handleConnection pathToWatch mgr pending = do
    let send = S.sendTextData connection
    let update = do
          msg <- getCodeOrError pathToWatch
+         case msg of
+           Code code -> do
+             case glslFile of
+               Just fname_ -> writeFile fname_ code
+               Nothing -> return ()
+           _ -> return ()
          send . encode $ msg
 
    let onChange e = do
